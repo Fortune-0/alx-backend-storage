@@ -60,3 +60,40 @@ class Cache:
         the value and applies a lambda function to decode it as a string.
         """
         return self.get(key, fn=lambda x: x.decode('utf8()'))
+
+    def count_calls(method: Callable) -> Callable:
+        """ Decorator for Cache class methods to track call count
+        """
+        @functools.wraps(method)
+        def wrapper(self: Any, *args, **kwargs) -> str:
+            """ Wraps called method and adds its call count
+            redis before execution
+            """
+            self._redis.incr(method.__qualname__)
+            return method(self, *args, **kwargs)
+        return wrapper
+
+    @count_calls
+    def store(self, data: Union[str, bytes,  int,  float]) -> str:
+
+        """ Stores data in redis with randomly generated key
+        """
+        key = str(uuid4())
+        client = self._redis
+        client.set(key, data)
+        return key
+
+    def call_history(method: Callable) -> Callable:
+
+        """ Decorator for Cache class method to track args
+        """
+    @wraps(method)
+    def wrapper(self: Any, *args) -> str:
+        """ Wraps called method and tracks its passed argument by storing
+            them to redis
+        """
+        self._redis.rpush(f'{method.__qualname__}:inputs', str(args))
+        output = method(self, *args)
+        self._redis.rpush(f'{method.__qualname__}:outputs', output)
+        return output
+        return wrapper
